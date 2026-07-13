@@ -1,47 +1,63 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-export const staff = sqliteTable("staff", {
+export const members = sqliteTable("hub_members", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  role: text("role").notNull(),
+  email: text("email").notNull(),
+  roleKey: text("role_key").notNull(),
   status: text("status").notNull().default("Active"),
+  isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
   initials: text("initials").notNull(),
-});
+}, (table) => [uniqueIndex("hub_members_email_unique").on(table.email)]);
 
-export const roles = sqliteTable("roles", {
+export const roleTemplates = sqliteTable("hub_role_templates", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
   description: text("description").notNull(),
-  members: integer("members").notNull().default(0),
-  providers: text("providers").notNull(),
-  accessLevel: text("access_level").notNull(),
-});
+}, (table) => [uniqueIndex("hub_role_templates_key_unique").on(table.key)]);
 
-export const connections = sqliteTable("connections", {
+export const connections = sqliteTable("hub_connections", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  provider: text("provider").notNull(),
-  scope: text("scope").notNull(),
-  ownerType: text("owner_type").notNull(),
+  key: text("key").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  authModel: text("auth_model").notNull(),
+  delivery: text("delivery").notNull(),
   status: text("status").notNull(),
-  coverage: text("coverage").notNull(),
-  lastChecked: text("last_checked").notNull(),
+  statusDetail: text("status_detail").notNull(),
   color: text("color").notNull(),
   initials: text("initials").notNull(),
+}, (table) => [uniqueIndex("hub_connections_key_unique").on(table.key)]);
+
+export const roleConnections = sqliteTable("hub_role_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  roleKey: text("role_key").notNull(),
+  connectionKey: text("connection_key").notNull(),
+  accountScope: text("account_scope").notNull(),
+}, (table) => [uniqueIndex("hub_role_connections_role_connection_unique").on(table.roleKey, table.connectionKey)]);
+
+export const connectionRequests = sqliteTable("hub_connection_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  memberId: integer("member_id").notNull(),
+  connectionKey: text("connection_key").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("Pending"),
+  createdAt: text("created_at").notNull(),
+  decidedBy: text("decided_by"),
 });
 
-export const approvals = sqliteTable("approvals", {
+export const installationReports = sqliteTable("hub_installation_reports", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  requester: text("requester").notNull(),
-  action: text("action").notNull(),
-  provider: text("provider").notNull(),
-  resource: text("resource").notNull(),
-  risk: text("risk").notNull(),
-  status: text("status").notNull().default("Pending"),
+  memberId: integer("member_id").notNull(),
+  connectionKey: text("connection_key").notNull(),
+  operatingSystem: text("operating_system").notNull(),
+  status: text("status").notNull(),
+  detail: text("detail").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
-export const auditEvents = sqliteTable("audit_events", {
+export const auditEvents = sqliteTable("hub_audit_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   actor: text("actor").notNull(),
   event: text("event").notNull(),

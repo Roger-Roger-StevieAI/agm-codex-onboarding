@@ -5,8 +5,8 @@ import { ConnectionHub } from "./ConnectionHub";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Connection Hub",
-  description: "Company access, connections, and approvals for Codex.",
+  title: "AGM Codex Onboarding",
+  description: "Role-based Codex setup for AGM staff.",
 };
 
 export default async function Home() {
@@ -15,8 +15,9 @@ export default async function Home() {
   return (
     <ConnectionHub
       viewer={{
-        name: user.displayName,
+        name: user.member.name,
         email: user.email,
+        isAdmin: user.member.isAdmin,
       }}
     />
   );

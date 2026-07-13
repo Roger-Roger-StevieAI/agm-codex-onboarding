@@ -1,0 +1,25 @@
+{
+  "name": "agm-codex-onboarding",
+  "version": "0.2.0",
+  "description": "Install and verify the AGM-approved Codex connections assigned to your role.",
+  "author": {
+    "name": "AGM Agency"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AGM Codex Onboarding",
+    "shortDescription": "Get your approved AGM tools working in Codex.",
+    "longDescription": "See the connections assigned to your AGM role, complete local setup, verify read-only Meta access, and request additional tools without receiving shared credentials.",
+    "developerName": "AGM Agency",
+    "category": "Productivity",
+    "capabilities": ["Read", "Onboarding"],
+    "websiteURL": "https://agm-connection-hub.stevie926063.chatgpt.site",
+    "defaultPrompt": [
+      "Show my AGM setup.",
+      "Test my assigned connections.",
+      "Request another AGM connection."
+    ],
+    "brandColor": "#123D32"
+  },
+  "mcpServers": "./.mcp.json"
+}

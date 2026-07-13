@@ -1,11 +1,42 @@
 import { env } from "cloudflare:workers";
 
+export type HubMember = {
+  id: number;
+  name: string;
+  email: string;
+  roleKey: string;
+  roleName: string;
+  status: string;
+  isAdmin: boolean;
+  initials: string;
+};
+
+type RawHubMember = Omit<HubMember, "isAdmin"> & { isAdmin: number | boolean };
+
+export type HubConnection = {
+  id: number;
+  key: string;
+  name: string;
+  description: string;
+  authModel: "shared_brokered" | "personal_oauth" | "local_cli";
+  delivery: string;
+  status: string;
+  statusDetail: string;
+  accountScope: string;
+  color: string;
+  initials: string;
+};
+
 export type HubSnapshot = {
-  staff: Array<{ id: number; name: string; email: string; role: string; status: string; initials: string }>;
-  roles: Array<{ id: number; name: string; description: string; members: number; providers: string[]; accessLevel: string }>;
-  connections: Array<{ id: number; provider: string; scope: string; ownerType: string; status: string; coverage: string; lastChecked: string; color: string; initials: string }>;
-  approvals: Array<{ id: number; requester: string; action: string; provider: string; resource: string; risk: string; status: string; createdAt: string }>;
+  viewer: HubMember;
+  members: HubMember[];
+  roles: Array<{ key: string; name: string; description: string; connections: string[] }>;
+  connections: HubConnection[];
+  availableConnections: Array<{ key: string; name: string; description: string; authModel: string; delivery: string }>;
+  requests: Array<{ id: number; requester: string; requesterEmail: string; connectionKey: string; connectionName: string; reason: string; status: string; createdAt: string; decidedBy: string | null }>;
+  installationReports: Array<{ id: number; memberEmail: string; connectionKey: string; operatingSystem: string; status: string; detail: string; createdAt: string }>;
   auditEvents: Array<{ id: number; actor: string; event: string; target: string; result: string; createdAt: string }>;
+  installer: { repository: string; macCommand: string; windowsCommand: string };
 };
 
 function database(): D1Database {
@@ -16,91 +47,133 @@ function database(): D1Database {
 export async function initializeHub() {
   const db = database();
   await db.batch([
-    db.prepare("CREATE TABLE IF NOT EXISTS staff (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, role TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Active', initials TEXT NOT NULL)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL, members INTEGER NOT NULL DEFAULT 0, providers TEXT NOT NULL, access_level TEXT NOT NULL)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS connections (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, scope TEXT NOT NULL, owner_type TEXT NOT NULL, status TEXT NOT NULL, coverage TEXT NOT NULL, last_checked TEXT NOT NULL, color TEXT NOT NULL, initials TEXT NOT NULL)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS approvals (id INTEGER PRIMARY KEY AUTOINCREMENT, requester TEXT NOT NULL, action TEXT NOT NULL, provider TEXT NOT NULL, resource TEXT NOT NULL, risk TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Pending', created_at TEXT NOT NULL)"),
-    db.prepare("CREATE TABLE IF NOT EXISTS audit_events (id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, event TEXT NOT NULL, target TEXT NOT NULL, result TEXT NOT NULL, created_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, role_key TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Active', is_admin INTEGER NOT NULL DEFAULT 0, initials TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_role_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_connections (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT NOT NULL, auth_model TEXT NOT NULL, delivery TEXT NOT NULL, status TEXT NOT NULL, status_detail TEXT NOT NULL, color TEXT NOT NULL, initials TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_role_connections (id INTEGER PRIMARY KEY AUTOINCREMENT, role_key TEXT NOT NULL, connection_key TEXT NOT NULL, account_scope TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_connection_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER NOT NULL, connection_key TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Pending', created_at TEXT NOT NULL, decided_by TEXT)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_installation_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER NOT NULL, connection_key TEXT NOT NULL, operating_system TEXT NOT NULL, status TEXT NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS hub_audit_events (id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, event TEXT NOT NULL, target TEXT NOT NULL, result TEXT NOT NULL, created_at TEXT NOT NULL)"),
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS hub_role_connections_role_connection_unique ON hub_role_connections (role_key, connection_key)"),
   ]);
 
-  const count = await db.prepare("SELECT COUNT(*) AS count FROM roles").first<{ count: number }>();
+  const count = await db.prepare("SELECT COUNT(*) AS count FROM hub_members").first<{ count: number }>();
   if ((count?.count ?? 0) > 0) return;
 
   await db.batch([
-    db.prepare("INSERT INTO roles (name, description, members, providers, access_level) VALUES (?, ?, ?, ?, ?)").bind("Brand Manager", "Manage client campaigns, content, files, and reporting across every assigned brand.", 14, "Meta Ads|Amazon Ads|TikTok Ads|YouTube|GHL|Google Drive|Egnyte|Higgsfield", "Read + confirmed writes"),
-    db.prepare("INSERT INTO roles (name, description, members, providers, access_level) VALUES (?, ?, ?, ?, ?)").bind("Accountant", "Review spend, settlements, invoices, billing, and financial exports without campaign editing.", 5, "Meta Billing|Amazon Seller|Amazon Ads|GHL Payments|Google Drive|Egnyte", "Financial read access"),
-    db.prepare("INSERT INTO roles (name, description, members, providers, access_level) VALUES (?, ?, ?, ?, ?)").bind("Administrator", "Manage staff, templates, shared connections, approvals, and company access policy.", 3, "Connection Hub|All providers", "Administration"),
-    db.prepare("INSERT INTO staff (name, email, role, status, initials) VALUES (?, ?, ?, ?, ?)").bind("Maya Chen", "maya@agmagency.com", "Brand Manager", "Active", "MC"),
-    db.prepare("INSERT INTO staff (name, email, role, status, initials) VALUES (?, ?, ?, ?, ?)").bind("Jordan Ellis", "jordan@agmagency.com", "Brand Manager", "Active", "JE"),
-    db.prepare("INSERT INTO staff (name, email, role, status, initials) VALUES (?, ?, ?, ?, ?)").bind("Lena Ortiz", "lena@agmagency.com", "Accountant", "Active", "LO"),
-    db.prepare("INSERT INTO staff (name, email, role, status, initials) VALUES (?, ?, ?, ?, ?)").bind("Marcus Reed", "marcus@agmagency.com", "Brand Manager", "Needs setup", "MR"),
-    db.prepare("INSERT INTO staff (name, email, role, status, initials) VALUES (?, ?, ?, ?, ?)").bind("Priya Shah", "priya@agmagency.com", "Administrator", "Active", "PS"),
-    db.prepare("INSERT INTO staff (name, email, role, status, initials) VALUES (?, ?, ?, ?, ?)").bind("Daniel Kim", "daniel@agmagency.com", "Accountant", "Active", "DK"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("Meta Ads", "Company shared", "Client", "Connected", "20 of 20 clients", "2 min ago", "#3766e8", "M"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("Google Drive", "Personal OAuth", "Personal", "Connected", "24 staff", "5 min ago", "#f2b705", "G"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("Egnyte", "Company + personal", "Mixed", "Connected", "22 staff", "8 min ago", "#7b45d6", "E"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("Higgsfield", "Company workspace", "Company", "Connected", "18 seats", "12 min ago", "#18181b", "H"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("YouTube", "Client channels", "Client", "Attention", "17 of 20 clients", "1 hr ago", "#e52d27", "Y"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("GHL", "Agency locations", "Client", "Connected", "20 locations", "18 min ago", "#15a374", "GHL"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("Amazon", "Seller + Ads", "Client", "Setup required", "0 of 12 clients", "Not connected", "#ef8c1a", "A"),
-    db.prepare("INSERT INTO connections (provider, scope, owner_type, status, coverage, last_checked, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind("TikTok Ads", "Business accounts", "Client", "Setup required", "0 of 8 clients", "Not connected", "#202124", "T"),
-    db.prepare("INSERT INTO approvals (requester, action, provider, resource, risk, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind("Maya Chen", "Increase campaign budget to $4,500", "Meta Ads", "Hartwell Summer Launch", "Financial", "Pending", "12 minutes ago"),
-    db.prepare("INSERT INTO approvals (requester, action, provider, resource, risk, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind("Jordan Ellis", "Publish product launch video", "YouTube", "Northstar Home", "Publishing", "Pending", "34 minutes ago"),
-    db.prepare("INSERT INTO approvals (requester, action, provider, resource, risk, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind("Marcus Reed", "Connect personal Google Drive", "Google Drive", "Personal account", "Connection", "Pending", "1 hour ago"),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind("Maya Chen", "Viewed campaign insights", "Meta Ads · all clients", "Allowed", "2 minutes ago"),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind("Priya Shah", "Updated role template", "Brand Manager", "Saved", "18 minutes ago"),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind("Lena Ortiz", "Exported settlement report", "Amazon · Willow & Pine", "Allowed", "42 minutes ago"),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind("Connection Hub", "Blocked unauthorized tool", "Meta Ads · delete campaign", "Blocked", "1 hour ago"),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind("Daniel Kim", "Opened billing summary", "GHL · 20 locations", "Allowed", "2 hours ago"),
+    db.prepare("INSERT INTO hub_role_templates (key, name, description) VALUES (?, ?, ?)").bind("connection-admin", "Connection Hub Admin", "Assign templates, approve requests, manage shared connections, and revoke access."),
+    db.prepare("INSERT INTO hub_role_templates (key, name, description) VALUES (?, ?, ?)").bind("staff-tester", "Staff Tester", "Install approved capabilities and verify the employee onboarding experience."),
+    db.prepare("INSERT INTO hub_members (name, email, role_key, status, is_admin, initials) VALUES (?, ?, ?, ?, ?, ?)").bind("Stevie Kirk", "stevie@agmagency.com", "connection-admin", "Active", 1, "SK"),
+    db.prepare("INSERT INTO hub_members (name, email, role_key, status, is_admin, initials) VALUES (?, ?, ?, ?, ?, ?)").bind("Jean", "jean@agmagency.com", "staff-tester", "Active", 0, "J"),
+    db.prepare("INSERT INTO hub_connections (key, name, description, auth_model, delivery, status, status_detail, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind("meta-ads", "Meta Ads", "Shared AGM access to assigned Meta Business ad accounts.", "shared_brokered", "Protected MCP", "Setup required", "AGM Meta OAuth has not been connected in Composio.", "#3766e8", "M"),
+    db.prepare("INSERT INTO hub_connections (key, name, description, auth_model, delivery, status, status_detail, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind("higgsfield", "Higgsfield", "Official CLI plus four durable Codex skills for image and video generation.", "local_cli", "CLI + Codex skills", "Needs login", "Install locally, sign in with Jean's Higgsfield account, then run the test image.", "#18181b", "H"),
+    db.prepare("INSERT INTO hub_connections (key, name, description, auth_model, delivery, status, status_detail, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind("google-drive", "Google Drive", "Personal Google Drive connection for future role templates.", "personal_oauth", "OAuth + MCP", "Available on request", "A Connection Hub admin must approve this connection before setup.", "#f2b705", "G"),
+    db.prepare("INSERT INTO hub_role_connections (role_key, connection_key, account_scope) VALUES (?, ?, ?)").bind("connection-admin", "meta-ads", "All AGM-authorized Meta Business accounts"),
+    db.prepare("INSERT INTO hub_role_connections (role_key, connection_key, account_scope) VALUES (?, ?, ?)").bind("connection-admin", "higgsfield", "Administrator test account"),
+    db.prepare("INSERT INTO hub_role_connections (role_key, connection_key, account_scope) VALUES (?, ?, ?)").bind("staff-tester", "meta-ads", "Read-only pilot account list and insights"),
+    db.prepare("INSERT INTO hub_role_connections (role_key, connection_key, account_scope) VALUES (?, ?, ?)").bind("staff-tester", "higgsfield", "Personal Higgsfield account on this device"),
+    db.prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind("Connection Hub", "Initialized onboarding pilot", "Stevie + Jean", "Ready", new Date().toISOString()),
   ]);
 }
 
-export async function getHubSnapshot(): Promise<HubSnapshot> {
+export async function getMemberByEmail(email: string): Promise<HubMember | null> {
+  await initializeHub();
+  const row = await database().prepare("SELECT m.id, m.name, m.email, m.role_key AS roleKey, r.name AS roleName, m.status, m.is_admin AS isAdmin, m.initials FROM hub_members m JOIN hub_role_templates r ON r.key = m.role_key WHERE lower(m.email) = lower(?) LIMIT 1").bind(email).first<RawHubMember>();
+  return row ? { ...row, isAdmin: Boolean(row.isAdmin) } : null;
+}
+
+export async function getHubSnapshot(viewer: HubMember): Promise<HubSnapshot> {
   await initializeHub();
   const db = database();
-  const [staffRows, roleRows, connectionRows, approvalRows, auditRows] = await Promise.all([
-    db.prepare("SELECT id, name, email, role, status, initials FROM staff ORDER BY name").all(),
-    db.prepare("SELECT id, name, description, members, providers, access_level AS accessLevel FROM roles ORDER BY id").all(),
-    db.prepare("SELECT id, provider, scope, owner_type AS ownerType, status, coverage, last_checked AS lastChecked, color, initials FROM connections ORDER BY id").all(),
-    db.prepare("SELECT id, requester, action, provider, resource, risk, status, created_at AS createdAt FROM approvals ORDER BY id DESC").all(),
-    db.prepare("SELECT id, actor, event, target, result, created_at AS createdAt FROM audit_events ORDER BY id DESC LIMIT 50").all(),
+  const [memberRows, roleRows, roleConnectionRows, connectionRows, availableConnectionRows, requestRows, reportRows, auditRows] = await Promise.all([
+    viewer.isAdmin ? db.prepare("SELECT m.id, m.name, m.email, m.role_key AS roleKey, r.name AS roleName, m.status, m.is_admin AS isAdmin, m.initials FROM hub_members m JOIN hub_role_templates r ON r.key = m.role_key ORDER BY m.is_admin DESC, m.name").all() : Promise.resolve({ results: [viewer] }),
+    db.prepare("SELECT key, name, description FROM hub_role_templates ORDER BY id").all(),
+    db.prepare("SELECT role_key AS roleKey, connection_key AS connectionKey, account_scope AS accountScope FROM hub_role_connections ORDER BY id").all(),
+    db.prepare("SELECT c.id, c.key, c.name, c.description, c.auth_model AS authModel, c.delivery, c.status, c.status_detail AS statusDetail, rc.account_scope AS accountScope, c.color, c.initials FROM hub_connections c JOIN hub_role_connections rc ON rc.connection_key = c.key WHERE rc.role_key = ? ORDER BY c.id").bind(viewer.roleKey).all(),
+    db.prepare("SELECT key, name, description, auth_model AS authModel, delivery FROM hub_connections WHERE key NOT IN (SELECT connection_key FROM hub_role_connections WHERE role_key = ?) ORDER BY id").bind(viewer.roleKey).all(),
+    viewer.isAdmin
+      ? db.prepare("SELECT q.id, m.name AS requester, m.email AS requesterEmail, q.connection_key AS connectionKey, c.name AS connectionName, q.reason, q.status, q.created_at AS createdAt, q.decided_by AS decidedBy FROM hub_connection_requests q JOIN hub_members m ON m.id = q.member_id JOIN hub_connections c ON c.key = q.connection_key ORDER BY q.id DESC").all()
+      : db.prepare("SELECT q.id, m.name AS requester, m.email AS requesterEmail, q.connection_key AS connectionKey, c.name AS connectionName, q.reason, q.status, q.created_at AS createdAt, q.decided_by AS decidedBy FROM hub_connection_requests q JOIN hub_members m ON m.id = q.member_id JOIN hub_connections c ON c.key = q.connection_key WHERE q.member_id = ? ORDER BY q.id DESC").bind(viewer.id).all(),
+    viewer.isAdmin
+      ? db.prepare("SELECT r.id, m.email AS memberEmail, r.connection_key AS connectionKey, r.operating_system AS operatingSystem, r.status, r.detail, r.created_at AS createdAt FROM hub_installation_reports r JOIN hub_members m ON m.id = r.member_id ORDER BY r.id DESC LIMIT 50").all()
+      : db.prepare("SELECT r.id, m.email AS memberEmail, r.connection_key AS connectionKey, r.operating_system AS operatingSystem, r.status, r.detail, r.created_at AS createdAt FROM hub_installation_reports r JOIN hub_members m ON m.id = r.member_id WHERE r.member_id = ? ORDER BY r.id DESC LIMIT 20").bind(viewer.id).all(),
+    viewer.isAdmin ? db.prepare("SELECT id, actor, event, target, result, created_at AS createdAt FROM hub_audit_events ORDER BY id DESC LIMIT 50").all() : Promise.resolve({ results: [] }),
   ]);
 
+  const roleConnections = roleConnectionRows.results as Array<{ roleKey: string; connectionKey: string; accountScope: string }>;
   return {
-    staff: staffRows.results as HubSnapshot["staff"],
-    roles: (roleRows.results as Array<Omit<HubSnapshot["roles"][number], "providers"> & { providers: string }>).map((role) => ({ ...role, providers: role.providers.split("|") })),
-    connections: connectionRows.results as HubSnapshot["connections"],
-    approvals: approvalRows.results as HubSnapshot["approvals"],
+    viewer,
+    members: (memberRows.results as RawHubMember[]).map((member) => ({ ...member, isAdmin: Boolean(member.isAdmin) })),
+    roles: (roleRows.results as Array<{ key: string; name: string; description: string }>).map((role) => ({ ...role, connections: roleConnections.filter((item) => item.roleKey === role.key).map((item) => item.connectionKey) })),
+    connections: connectionRows.results as HubConnection[],
+    availableConnections: availableConnectionRows.results as HubSnapshot["availableConnections"],
+    requests: requestRows.results as HubSnapshot["requests"],
+    installationReports: reportRows.results as HubSnapshot["installationReports"],
     auditEvents: auditRows.results as HubSnapshot["auditEvents"],
+    installer: {
+      repository: "https://github.com/Roger-Roger-StevieAI/agm-codex-onboarding",
+      macCommand: "curl -fsSL https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/main/install/install.sh | bash",
+      windowsCommand: "irm https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/main/install/install.ps1 | iex",
+    },
   };
 }
 
-export async function updateStaffRole(id: number, role: string, actor: string) {
-  await initializeHub();
+export async function assignRole(memberId: number, roleKey: string, actor: HubMember) {
+  if (!actor.isAdmin) throw new Error("Administrator access required");
   const db = database();
-  const person = await db.prepare("SELECT name FROM staff WHERE id = ?").bind(id).first<{ name: string }>();
+  const target = await db.prepare("SELECT name FROM hub_members WHERE id = ?").bind(memberId).first<{ name: string }>();
   await db.batch([
-    db.prepare("UPDATE staff SET role = ? WHERE id = ?").bind(role, id),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor, "Changed staff role", `${person?.name ?? "Staff member"} → ${role}`, "Saved", "Just now"),
+    db.prepare("UPDATE hub_members SET role_key = ? WHERE id = ?").bind(roleKey, memberId),
+    db.prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor.name, "Assigned onboarding template", target?.name ?? "Member", "Saved", new Date().toISOString()),
   ]);
 }
 
-export async function decideApproval(id: number, status: "Approved" | "Denied", actor: string) {
-  await initializeHub();
+export async function setMemberStatus(memberId: number, status: "Active" | "Disabled", actor: HubMember) {
+  if (!actor.isAdmin) throw new Error("Administrator access required");
+  if (memberId === actor.id && status === "Disabled") throw new Error("You cannot disable your own administrator access");
   const db = database();
-  const approval = await db.prepare("SELECT action, provider FROM approvals WHERE id = ?").bind(id).first<{ action: string; provider: string }>();
+  const target = await db.prepare("SELECT name FROM hub_members WHERE id = ?").bind(memberId).first<{ name: string }>();
   await db.batch([
-    db.prepare("UPDATE approvals SET status = ? WHERE id = ?").bind(status, id),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor, `${status} request`, `${approval?.provider ?? "Provider"} · ${approval?.action ?? "Action"}`, status, "Just now"),
+    db.prepare("UPDATE hub_members SET status = ? WHERE id = ?").bind(status, memberId),
+    db.prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor.name, status === "Disabled" ? "Revoked hub access" : "Restored hub access", target?.name ?? "Member", status, new Date().toISOString()),
   ]);
 }
 
-export async function markConnectionReady(id: number, actor: string) {
-  await initializeHub();
+export async function requestConnection(member: HubMember, connectionKey: string, reason: string) {
   const db = database();
-  const connection = await db.prepare("SELECT provider FROM connections WHERE id = ?").bind(id).first<{ provider: string }>();
+  const connection = await db.prepare("SELECT name FROM hub_connections WHERE key = ?").bind(connectionKey).first<{ name: string }>();
+  if (!connection) throw new Error("Unknown connection");
+  const assigned = await db.prepare("SELECT 1 AS found FROM hub_role_connections WHERE role_key = ? AND connection_key = ?").bind(member.roleKey, connectionKey).first();
+  if (assigned) throw new Error("This connection is already assigned to your role");
+  const pending = await db.prepare("SELECT 1 AS found FROM hub_connection_requests WHERE member_id = ? AND connection_key = ? AND status = 'Pending'").bind(member.id, connectionKey).first();
+  if (pending) throw new Error("A request for this connection is already pending");
   await db.batch([
-    db.prepare("UPDATE connections SET status = 'Connected', last_checked = 'Just now' WHERE id = ?").bind(id),
-    db.prepare("INSERT INTO audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor, "Completed connection review", connection?.provider ?? "Provider", "Connected", "Just now"),
+    db.prepare("INSERT INTO hub_connection_requests (member_id, connection_key, reason, status, created_at) VALUES (?, ?, ?, 'Pending', ?)").bind(member.id, connectionKey, reason.trim() || "Requested through Connection Hub", new Date().toISOString()),
+    db.prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(member.name, "Requested connection", connection.name, "Pending", new Date().toISOString()),
   ]);
+}
+
+export async function decideConnectionRequest(requestId: number, decision: "Approved" | "Denied", actor: HubMember) {
+  if (!actor.isAdmin) throw new Error("Administrator access required");
+  const db = database();
+  const request = await db.prepare("SELECT c.name AS connectionName, m.name AS memberName, m.role_key AS roleKey, q.connection_key AS connectionKey, q.status FROM hub_connection_requests q JOIN hub_connections c ON c.key = q.connection_key JOIN hub_members m ON m.id = q.member_id WHERE q.id = ?").bind(requestId).first<{ connectionName: string; memberName: string; roleKey: string; connectionKey: string; status: string }>();
+  if (!request || request.status !== "Pending") throw new Error("This request is no longer pending");
+  const statements = [
+    db.prepare("UPDATE hub_connection_requests SET status = ?, decided_by = ? WHERE id = ? AND status = 'Pending'").bind(decision, actor.email, requestId),
+    db.prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor.name, `${decision} connection request`, `${request?.memberName ?? "Member"} · ${request?.connectionName ?? "Connection"}`, decision, new Date().toISOString()),
+  ];
+  if (decision === "Approved") statements.push(db.prepare("INSERT OR IGNORE INTO hub_role_connections (role_key, connection_key, account_scope) VALUES (?, ?, ?)").bind(request.roleKey, request.connectionKey, "Approved personal connection"));
+  await db.batch(statements);
+}
+
+export async function recordInstallation(member: HubMember, connectionKey: string, operatingSystem: string, status: string, detail: string) {
+  const assigned = await database().prepare("SELECT 1 AS found FROM hub_role_connections WHERE role_key = ? AND connection_key = ?").bind(member.roleKey, connectionKey).first();
+  if (!assigned) throw new Error("This connection is not assigned to your role");
+  if (connectionKey === "higgsfield" && status === "Ready" && !/^https?:\/\//im.test(detail)) throw new Error("A completed Higgsfield result URL is required before marking this connection ready");
+  const safeDetail = detail.replace(/(token|secret|password|authorization)\s*[:=]\s*\S+/gi, "$1=[redacted]").slice(0, 500);
+  await database().prepare("INSERT INTO hub_installation_reports (member_id, connection_key, operating_system, status, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(member.id, connectionKey, operatingSystem.slice(0, 30), status.slice(0, 40), safeDetail, new Date().toISOString()).run();
+}
+
+export async function setConnectionStatus(connectionKey: string, status: string, detail: string) {
+  await database().prepare("UPDATE hub_connections SET status = ?, status_detail = ? WHERE key = ?").bind(status, detail, connectionKey).run();
 }

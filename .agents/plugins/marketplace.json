@@ -1,14 +1,14 @@
 {
-  "name": "agm-private",
+  "name": "agm-codex-onboarding",
   "interface": {
-    "displayName": "AGM Private Plugins"
+    "displayName": "AGM Codex Onboarding"
   },
   "plugins": [
     {
-      "name": "connection-hub",
+      "name": "agm-codex-onboarding",
       "source": {
         "source": "local",
-        "path": "./plugins/connection-hub"
+        "path": "./plugins/agm-codex-onboarding"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -1,27 +1,19 @@
-import { env } from "cloudflare:workers";
 import { redirect } from "next/navigation";
+import { getMemberByEmail, type HubMember } from "@/db/hub";
 import { getChatGPTUser, requireChatGPTUser, type ChatGPTUser } from "./chatgpt-auth";
 
-function allowedEmails() {
-  return new Set(
-    (env.HUB_ALLOWED_EMAILS ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
+export type AuthorizedHubUser = ChatGPTUser & { member: HubMember };
 
-export function isHubEmailAllowed(email: string) {
-  return allowedEmails().has(email.trim().toLowerCase());
-}
-
-export async function getAuthorizedHubUser(): Promise<ChatGPTUser | null> {
+export async function getAuthorizedHubUser(): Promise<AuthorizedHubUser | null> {
   const user = await getChatGPTUser();
-  return user && isHubEmailAllowed(user.email) ? user : null;
+  if (!user) return null;
+  const member = await getMemberByEmail(user.email);
+  return member?.status === "Active" ? { ...user, member } : null;
 }
 
-export async function requireAuthorizedHubUser(returnTo: string): Promise<ChatGPTUser> {
+export async function requireAuthorizedHubUser(returnTo: string): Promise<AuthorizedHubUser> {
   const user = await requireChatGPTUser(returnTo);
-  if (!isHubEmailAllowed(user.email)) redirect("/access-denied");
-  return user;
+  const member = await getMemberByEmail(user.email);
+  if (!member || member.status !== "Active") redirect("/access-denied");
+  return { ...user, member };
 }

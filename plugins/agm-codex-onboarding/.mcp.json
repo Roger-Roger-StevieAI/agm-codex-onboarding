@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "agm-connection-hub": {
+    "agm-onboarding-hub": {
       "type": "http",
       "url": "https://agm-connection-hub.stevie926063.chatgpt.site/mcp",
       "auth": "chatgpt"

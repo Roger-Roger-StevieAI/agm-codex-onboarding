@@ -18,18 +18,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("host") ?? "connection-hub.local";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const imageUrl = `${protocol}://${host}/og.png`;
-  const description = "One secure front door for every company connection in Codex.";
+  const description = "One AGM installer for every approved Codex connection.";
 
   return {
-    title: "Connection Hub",
+    title: "AGM Codex Onboarding",
     description,
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "Connection Hub",
+      title: "AGM Codex Onboarding",
       description,
-      images: [{ url: imageUrl, width: 1536, height: 1024, alt: "Connection Hub" }],
+      images: [{ url: imageUrl, width: 1536, height: 1024, alt: "AGM Codex Onboarding" }],
     },
-    twitter: { card: "summary_large_image", title: "Connection Hub", description, images: [imageUrl] },
+    twitter: { card: "summary_large_image", title: "AGM Codex Onboarding", description, images: [imageUrl] },
   };
 }
 
