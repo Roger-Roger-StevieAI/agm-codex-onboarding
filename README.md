@@ -27,6 +27,8 @@ pnpm test
 
 The local dashboard runs at `http://localhost:3000`. Its MCP endpoint is `http://localhost:3000/mcp`.
 
+The owner-only production review is hosted at `https://agm-connection-hub.stevie926063.chatgpt.site`. The plugin uses current ChatGPT-session authentication for that trusted Sites origin; staff still need to be added to the site's access policy before they can use it.
+
 ## Live-provider activation
 
 Before staff can run real Meta, Amazon, TikTok, YouTube, GHL, Drive, Egnyte, or Higgsfield actions:

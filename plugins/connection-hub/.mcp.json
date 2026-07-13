@@ -2,7 +2,8 @@
   "mcpServers": {
     "agm-connection-hub": {
       "type": "http",
-      "url": "http://localhost:3000/mcp"
+      "url": "https://agm-connection-hub.stevie926063.chatgpt.site/mcp",
+      "auth": "chatgpt"
     }
   }
 }

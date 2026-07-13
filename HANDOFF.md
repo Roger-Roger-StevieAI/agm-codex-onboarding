@@ -1,0 +1,5 @@
+- Done: Built the Connection Hub dashboard, persistent D1 model, role templates, approval center, audit trail, read-only MCP gateway, and repo-local Codex plugin marketplace. Published an owner-only Sites review.
+- Files changed: `app/`, `db/`, `drizzle/`, `plugins/connection-hub/`, `.agents/plugins/marketplace.json`, `.openai/hosting.json`, `README.md`, and project build/test configuration.
+- Validation: `pnpm run typecheck`, `pnpm run lint`, `pnpm test`, plugin validator, local `/api/hub`, MCP `initialize`, and MCP `tools/list` all pass.
+- Blockers: Live provider OAuth/API authorizations are not connected. Staff/site access groups are not configured. The first MCP release is intentionally read-only. Seeded provider states are demonstration data.
+- Next agent action: Confirm the staff access group and first live provider priority, connect the broker account, replace seeded connection states with broker health checks, then add approval-gated provider actions.
