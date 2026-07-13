@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agm-connection-hub": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}

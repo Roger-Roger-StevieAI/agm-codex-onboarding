@@ -1,0 +1,20 @@
+{
+  "name": "agm-private",
+  "interface": {
+    "displayName": "AGM Private Plugins"
+  },
+  "plugins": [
+    {
+      "name": "connection-hub",
+      "source": {
+        "source": "local",
+        "path": "./plugins/connection-hub"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
