@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getChatGPTUser } from "./chatgpt-auth";
+import { requireAuthorizedHubUser } from "./hub-access";
 import { ConnectionHub } from "./ConnectionHub";
 
 export const dynamic = "force-dynamic";
@@ -10,13 +10,13 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const user = await getChatGPTUser();
+  const user = await requireAuthorizedHubUser("/");
 
   return (
     <ConnectionHub
       viewer={{
-        name: user?.displayName ?? "Stevie Kirk",
-        email: user?.email ?? "stevie@agmagency.com",
+        name: user.displayName,
+        email: user.email,
       }}
     />
   );

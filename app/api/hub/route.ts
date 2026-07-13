@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decideApproval, getHubSnapshot, markConnectionReady, updateStaffRole } from "../../../db/hub";
-import { getChatGPTUser } from "../../chatgpt-auth";
+import { getAuthorizedHubUser } from "../../hub-access";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const user = await getAuthorizedHubUser();
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   try {
     return NextResponse.json(await getHubSnapshot());
   } catch (error) {
@@ -13,8 +15,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getChatGPTUser();
-  const actor = user?.displayName ?? "Stevie Kirk";
+  const user = await getAuthorizedHubUser();
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  const actor = user.displayName;
   const body = (await request.json()) as { action?: string; id?: number; role?: string; decision?: "Approved" | "Denied" };
 
   if (!body.action || !body.id) return NextResponse.json({ error: "Invalid request" }, { status: 400 });

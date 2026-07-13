@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getHubSnapshot } from "@/db/hub";
+import { getAuthorizedHubUser } from "@/app/hub-access";
 
 type JsonRpcRequest = {
   jsonrpc?: "2.0";
@@ -60,6 +61,9 @@ function toolContent(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getAuthorizedHubUser();
+  if (!user) return NextResponse.json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Sign in with an approved ChatGPT account" } }, { headers, status: 401 });
+
   let rpc: JsonRpcRequest;
   try {
     rpc = await request.json() as JsonRpcRequest;
@@ -105,7 +109,9 @@ export async function POST(request: NextRequest) {
   return failure(rpc.id, -32601, `Method not found: ${rpc.method}`);
 }
 
-export function GET() {
+export async function GET() {
+  const user = await getAuthorizedHubUser();
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { headers, status: 401 });
   return NextResponse.json({ name: "AGM Connection Hub MCP", version: "0.1.0", transport: "streamable-http", tools: tools.map((tool) => tool.name) }, { headers });
 }
 

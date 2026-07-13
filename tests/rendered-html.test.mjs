@@ -32,3 +32,17 @@ test("includes a team plugin backed by the MCP gateway", async () => {
   assert.match(route, /hub_list_connections/);
   assert.match(route, /readOnlyHint: true/);
 });
+
+test("requires ChatGPT identity and an explicit reviewer allowlist", async () => {
+  const [page, access, api, mcp] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/hub-access.ts", root), "utf8"),
+    readFile(new URL("app/api/hub/route.ts", root), "utf8"),
+    readFile(new URL("app/mcp/route.ts", root), "utf8"),
+  ]);
+
+  assert.match(page, /requireAuthorizedHubUser/);
+  assert.match(access, /HUB_ALLOWED_EMAILS/);
+  assert.match(api, /getAuthorizedHubUser/);
+  assert.match(mcp, /getAuthorizedHubUser/);
+});
