@@ -19,7 +19,9 @@ if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
 
 Write-Host "Adding the AGM Codex marketplace and plugin..."
 codex plugin marketplace add $MarketplaceRepo --ref main
+if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Codex could not add the AGM marketplace." }
 codex plugin add "$PluginName@$MarketplaceName"
+if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Codex could not install the AGM onboarding plugin." }
 
 if (-not (Get-Command higgsfield -ErrorAction SilentlyContinue)) {
   if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
@@ -27,6 +29,7 @@ if (-not (Get-Command higgsfield -ErrorAction SilentlyContinue)) {
   }
   Write-Host "Installing the official Higgsfield CLI..."
   npm install --global @higgsfield/cli
+  if ($LASTEXITCODE -ne 0) { Stop-Onboarding "The official Higgsfield CLI install failed." 3 }
 }
 
 if (-not (Get-Command higgsfield -ErrorAction SilentlyContinue)) {
@@ -59,18 +62,21 @@ if ($PluginList -notmatch [Regex]::Escape($PluginName)) {
   Stop-Onboarding "Codex could not verify the AGM plugin. Restart Codex and rerun the installer."
 }
 higgsfield --version
+if ($LASTEXITCODE -ne 0) { Stop-Onboarding "The Higgsfield CLI could not be verified." 3 }
 
-try {
-  higgsfield account status
-} catch {
+& higgsfield account status
+if ($LASTEXITCODE -ne 0) {
   Write-Host "Higgsfield needs your personal login. Complete the browser step that opens next."
-  higgsfield auth login
-  higgsfield account status
+  & higgsfield auth login
+  if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Higgsfield browser login did not complete." 4 }
+  & higgsfield account status
+  if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Higgsfield login is still incomplete. Run 'higgsfield auth login' and then 'higgsfield account status'." 4 }
 }
 
 $RunTest = Read-Host "Generate one inexpensive Higgsfield onboarding test image now? [y/N]"
 if ($RunTest -match "^[Yy]$") {
   $Result = higgsfield generate create z_image --prompt "Simple blue AGM onboarding checkmark on a white background" --wait --no-color | Out-String
+  if ($LASTEXITCODE -ne 0) { Stop-Onboarding "The Higgsfield test generation failed." 5 }
   Write-Host $Result
   if ($Result -notmatch "https?://") {
     Stop-Onboarding "The test finished without a result URL. Run the test again before marking Higgsfield ready." 5

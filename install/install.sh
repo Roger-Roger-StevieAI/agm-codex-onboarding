@@ -27,6 +27,7 @@ if ! command -v higgsfield >/dev/null 2>&1; then
 fi
 
 command -v higgsfield >/dev/null 2>&1 || fail "Higgsfield CLI did not become available. See https://github.com/higgsfield-ai/cli and rerun this installer." 3
+command -v git >/dev/null 2>&1 || fail "Git is required to install the official Higgsfield skills. Install Git from https://git-scm.com/download/mac and rerun this installer." 3
 
 say "Installing four official Higgsfield skills into durable Codex storage…"
 workdir="$(mktemp -d)"
