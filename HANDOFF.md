@@ -11,3 +11,11 @@
 - Validation: TypeScript, ESLint, production build, and all five Node tests pass. Published production version 8 at `https://agm-connection-hub.stevie926063.chatgpt.site`.
 - Blockers: No blocker for the invite workflow. Existing provider-specific blockers remain: Meta OAuth, individual Higgsfield login/test, and Google Sheets authorization.
 - Next agent action: Use Staff > Invite and assign to onboard future staff in one step; choose `Custom connections` when a reusable template is not needed.
+
+## 2026-07-14 — Codex — Added simple operator health console
+
+- Done: Replaced the admin setup landing page with a one-button operator console: Check everything, show only actionable failures, launch secure provider sign-in when possible, and keep the staff invite flow one step. A full live diagnostic run confirmed the installed plugins and Google-connected capabilities; the console now trusts the newest diagnostic result instead of stale setup labels and ignores the intentionally disabled legacy Computer Use MCP entry.
+- Files changed: `app/ConnectionHub.tsx`, `app/api/hub/route.ts`, `app/globals.css`, and this handoff.
+- Validation: TypeScript, ESLint, production build, and all five Node tests pass. Higgsfield local account status and a real verification image generation passed. Published production version 9 at `https://agm-connection-hub.stevie926063.chatgpt.site`; version 10 is queued for the diagnostic-display correction.
+- Blockers: Meta Ads still needs the secure provider OAuth approval; Zapier is not logged in locally; Higgsfield is verified for the admin account but each staff member must sign into their own account when assigned. The legacy Computer Use MCP is intentionally disabled; the installed Computer Use plugin is healthy.
+- Next agent action: Finish the version 10 publish, then use the operator console's Meta Ads Fix sign-in button and complete the provider approval if prompted. Re-run Check everything afterward.
