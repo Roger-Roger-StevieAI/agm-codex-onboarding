@@ -52,6 +52,8 @@ Read-only Meta tools:
 
 The dashboard lets Stevie assign templates, approve or deny requests, revoke or restore staff, inspect installation reports, and review the onboarding audit trail. Deactivated members fail every dashboard, API, and MCP authorization check immediately.
 
+For the current test, the administrator catalog also contains a secret-free snapshot of the capabilities detected in Stevie's Codex profile: installed plugins, configured MCPs, available Codex Apps, and Higgsfield. The Connections screen supports search, filters, and direct role-template assignment. Detection never copies MCP URLs, embedded credentials, environment values, OAuth tokens, or local provider tokens into the hub.
+
 ## Required Meta activation
 
 The code is ready, but live Meta verification requires AGM's external authorization:

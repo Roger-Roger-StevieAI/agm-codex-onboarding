@@ -5,10 +5,12 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("ships the onboarding hub instead of demonstration data", async () => {
-  const [page, layout, hub] = await Promise.all([
+  const [page, layout, hub, dashboard, api] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("db/hub.ts", root), "utf8"),
+    readFile(new URL("app/ConnectionHub.tsx", root), "utf8"),
+    readFile(new URL("app/api/hub/route.ts", root), "utf8"),
   ]);
 
   assert.match(page, /<ConnectionHub/);
@@ -17,6 +19,14 @@ test("ships the onboarding hub instead of demonstration data", async () => {
   assert.match(hub, /shared_brokered/);
   assert.match(hub, /personal_oauth/);
   assert.match(hub, /local_cli/);
+  assert.match(hub, /gmail-app/);
+  assert.match(hub, /github-app/);
+  assert.match(hub, /composio-mcp/);
+  assert.match(hub, /zapier-mcp/);
+  assert.match(hub, /catalogConnections/);
+  assert.match(dashboard, /Search and assign connections/);
+  assert.match(dashboard, /set-role-connection/);
+  assert.match(api, /setRoleConnection/);
   assert.doesNotMatch(hub, /demonstration/i);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
 });

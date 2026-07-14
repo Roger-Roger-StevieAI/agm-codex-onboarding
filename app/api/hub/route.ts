@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assignRole, decideConnectionRequest, getHubSnapshot, recordInstallation, requestConnection, setConnectionStatus, setMemberStatus } from "@/db/hub";
+import { assignRole, decideConnectionRequest, getHubSnapshot, recordInstallation, requestConnection, setConnectionStatus, setMemberStatus, setRoleConnection } from "@/db/hub";
 import { getAuthorizedHubUser } from "@/app/hub-access";
 import { listMetaAdAccounts } from "@/app/meta-ads";
 
@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
         break;
       case "set-member-status":
         await setMemberStatus(Number(body.memberId), body.status === "Disabled" ? "Disabled" : "Active", user.member);
+        break;
+      case "set-role-connection":
+        await setRoleConnection(String(body.roleKey), String(body.connectionKey), body.assigned === true, user.member);
         break;
       case "request-connection":
         await requestConnection(user.member, String(body.connectionKey), String(body.reason ?? ""));

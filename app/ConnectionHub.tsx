@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type View = "setup" | "team" | "templates" | "requests" | "activity";
+type View = "setup" | "connections" | "team" | "templates" | "requests" | "activity";
 type Member = { id: number; name: string; email: string; roleKey: string; roleName: string; status: string; isAdmin: boolean; initials: string };
 type Connection = { id: number; key: string; name: string; description: string; authModel: string; delivery: string; status: string; statusDetail: string; accountScope: string; color: string; initials: string };
 type Snapshot = {
@@ -10,6 +10,7 @@ type Snapshot = {
   members: Member[];
   roles: Array<{ key: string; name: string; description: string; connections: string[] }>;
   connections: Connection[];
+  catalogConnections: Array<Omit<Connection, "accountScope"> & { assignedRoles: string[] }>;
   availableConnections: Array<{ key: string; name: string; description: string; authModel: string; delivery: string }>;
   requests: Array<{ id: number; requester: string; requesterEmail: string; connectionKey: string; connectionName: string; reason: string; status: string; createdAt: string; decidedBy: string | null }>;
   installationReports: Array<{ id: number; memberEmail: string; connectionKey: string; operatingSystem: string; status: string; detail: string; createdAt: string }>;
@@ -19,6 +20,7 @@ type Snapshot = {
 
 const adminNav: Array<{ id: View; label: string; symbol: string }> = [
   { id: "setup", label: "My setup", symbol: "⌂" },
+  { id: "connections", label: "Connections", symbol: "⊞" },
   { id: "team", label: "Staff", symbol: "◎" },
   { id: "templates", label: "Templates", symbol: "◇" },
   { id: "requests", label: "Requests", symbol: "✓" },
@@ -76,7 +78,8 @@ export function ConnectionHub({ viewer }: { viewer: { name: string; email: strin
       <div className="mobile-nav" aria-label="Mobile navigation">{nav.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
       {notice ? <div className="notice" role="status"><span>✓</span>{notice}<button onClick={() => setNotice(null)} aria-label="Dismiss">×</button></div> : null}
       {!data ? <LoadingState /> : <>
-        {view === "setup" ? <MySetup data={data} os={os} setOs={setOs} busy={busy} mutate={mutate} /> : null}
+        {view === "setup" ? <MySetup data={data} os={os} setOs={setOs} busy={busy} mutate={mutate} openConnections={() => setView("connections")} notify={setNotice} /> : null}
+        {view === "connections" && data.viewer.isAdmin ? <Connections data={data} busy={busy} mutate={mutate} /> : null}
         {view === "team" && data.viewer.isAdmin ? <Team data={data} busy={busy} mutate={mutate} /> : null}
         {view === "templates" && data.viewer.isAdmin ? <Templates data={data} /> : null}
         {view === "requests" ? <Requests data={data} busy={busy} mutate={mutate} /> : null}
@@ -86,16 +89,18 @@ export function ConnectionHub({ viewer }: { viewer: { name: string; email: strin
   </div>;
 }
 
-function MySetup({ data, os, setOs, busy, mutate }: { data: Snapshot; os: "mac" | "windows"; setOs: (os: "mac" | "windows") => void; busy: string | null; mutate: (body: Record<string, unknown>, key: string, success: string) => Promise<void> }) {
+function MySetup({ data, os, setOs, busy, mutate, openConnections, notify }: { data: Snapshot; os: "mac" | "windows"; setOs: (os: "mac" | "windows") => void; busy: string | null; mutate: (body: Record<string, unknown>, key: string, success: string) => Promise<void>; openConnections: () => void; notify: (message: string) => void }) {
   const command = os === "mac" ? data.installer.macCommand : data.installer.windowsCommand;
-  const ready = data.connections.filter((connection) => connection.status === "Ready").length;
+  const ready = data.connections.filter((connection) => isReadyStatus(connection.status)).length;
+  const featured = data.connections.filter((connection) => connection.key === "meta-ads" || connection.key === "higgsfield");
   return <div className="page-stack">
-    <section className="hero-strip onboarding-hero"><div><span className="eyebrow">Your assigned Codex package</span><h2>Set up once.<br />Start working faster.</h2><p>Your role controls what gets installed and which company connections Codex can use. Provider passwords and API tokens never appear here.</p><div className="role-pill"><span>{data.viewer.initials}</span><div><small>Assigned template</small><strong>{data.viewer.roleName}</strong></div></div></div><div className="setup-score"><span>{ready}/{data.connections.length}</span><strong>connections ready</strong><small>{data.viewer.email}</small></div></section>
+    <section className="hero-strip onboarding-hero"><div><span className="eyebrow">Your assigned Codex package</span><h2>Set up once.<br />Start working faster.</h2><p>Your role controls what gets installed and which company connections Codex can use. Provider passwords and API tokens never appear here.</p><div className="role-pill"><span>{data.viewer.initials}</span><div><small>Assigned template</small><strong>{data.viewer.roleName}</strong></div></div></div><div className="setup-score"><span>{ready}/{data.connections.length}</span><strong>capabilities available</strong><small>{data.viewer.email}</small></div></section>
+    {data.viewer.isAdmin ? <section className="inventory-callout"><div><span className="inventory-icon">⊞</span><div><span className="eyebrow">Live test inventory</span><h3>{data.catalogConnections.length} Codex connections and capabilities detected</h3><p>Installed plugins, configured MCPs, Codex Apps, and local CLI capabilities are now listed. Assign or remove them from either role template directly.</p></div></div><button className="primary-button" onClick={openConnections}>Manage connections</button></section> : null}
     <section className="split-grid install-layout">
-      <article className="card install-card"><div className="card-heading"><div><span className="eyebrow">Step 1</span><h3>Run the AGM installer</h3></div><div className="os-switch"><button className={os === "mac" ? "active" : ""} onClick={() => setOs("mac")}>Mac</button><button className={os === "windows" ? "active" : ""} onClick={() => setOs("windows")}>Windows</button></div></div><p>The installer checks for Codex, adds the public AGM marketplace, installs the onboarding plugin, and adds Higgsfield for assigned staff.</p><div className="command-box"><code>{command}</code><button onClick={() => navigator.clipboard.writeText(command)}>Copy</button></div><ol className="step-list"><li><span>1</span>Open Terminal {os === "windows" ? "or PowerShell" : "on your Mac"}.</li><li><span>2</span>Paste the command and follow the prompts.</li><li><span>3</span>Restart Codex, then ask: “Show my AGM setup.”</li></ol></article>
+      <article className="card install-card"><div className="card-heading"><div><span className="eyebrow">Step 1</span><h3>Run the AGM installer</h3></div><div className="os-switch"><button className={os === "mac" ? "active" : ""} onClick={() => setOs("mac")}>Mac</button><button className={os === "windows" ? "active" : ""} onClick={() => setOs("windows")}>Windows</button></div></div><p>The installer checks for Codex, adds the public AGM marketplace, installs the onboarding plugin, and adds Higgsfield for assigned staff.</p><div className="command-box"><code>{command}</code><button onClick={async () => { await navigator.clipboard.writeText(command); notify("Installer command copied."); }}>Copy</button></div><ol className="step-list"><li><span>1</span>Open Terminal {os === "windows" ? "or PowerShell" : "on your Mac"}.</li><li><span>2</span>Paste the command and follow the prompts.</li><li><span>3</span>Restart Codex, then ask: “Show my AGM setup.”</li></ol></article>
       <article className="card pilot-note"><span className="callout-icon">⌾</span><h3>Pilot safety</h3><p>Meta is read-only. Higgsfield signs in locally with the employee’s own account. The public installer contains no AGM credentials.</p><a href={data.installer.repository} target="_blank" rel="noreferrer">Review public installer ↗</a></article>
     </section>
-    <section className="connection-grid onboarding-grid">{data.connections.map((connection) => <ConnectionCard key={connection.key} connection={connection} busy={busy} mutate={mutate} />)}</section>
+    <section className="connection-grid onboarding-grid">{featured.map((connection) => <ConnectionCard key={connection.key} connection={connection} busy={busy} mutate={mutate} />)}</section>
     {data.installationReports.length > 0 ? <section className="card table-card"><div className="card-heading"><div><span className="eyebrow">Verification</span><h3>Recent installation checks</h3></div></div><ReportTable reports={data.installationReports} /></section> : null}
   </div>;
 }
@@ -103,6 +108,49 @@ function MySetup({ data, os, setOs, busy, mutate }: { data: Snapshot; os: "mac" 
 function ConnectionCard({ connection, busy, mutate }: { connection: Connection; busy: string | null; mutate: (body: Record<string, unknown>, key: string, success: string) => Promise<void> }) {
   const isMeta = connection.key === "meta-ads";
   return <article className="connection-tile onboarding-tile"><div className="tile-top"><span className="provider-logo large" style={{ background: connection.color }}>{connection.initials}</span><span className={`status ${statusClass(connection.status)}`}><i />{connection.status}</span></div><h3>{connection.name}</h3><p>{connection.description}</p><dl><div><dt>Delivery</dt><dd>{connection.delivery}</dd></div><div><dt>Authentication</dt><dd>{authLabel(connection.authModel)}</dd></div><div><dt>Your scope</dt><dd>{connection.accountScope}</dd></div></dl><div className="connection-detail">{connection.statusDetail}</div>{isMeta ? <button className="mini-primary full-action" disabled={busy === "test-meta"} onClick={() => mutate({ action: "test-meta" }, "test-meta", "Meta account access was verified without changing any ad data.")}>{busy === "test-meta" ? "Checking…" : "Test read-only Meta access"}</button> : <div className="local-check"><strong>After install</strong><span>Run <code>higgsfield auth login</code>, then generate one test image.</span></div>}</article>;
+}
+
+function Connections({ data, busy, mutate }: { data: Snapshot; busy: string | null; mutate: (body: Record<string, unknown>, key: string, success: string) => Promise<void> }) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "plugins" | "mcps" | "apps" | "attention">("all");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filtered = data.catalogConnections.filter((connection) => {
+    const matchesQuery = !normalizedQuery || `${connection.name} ${connection.description} ${connection.delivery} ${connection.status}`.toLowerCase().includes(normalizedQuery);
+    const matchesFilter = filter === "all"
+      || (filter === "plugins" && connection.delivery === "Codex plugin")
+      || (filter === "mcps" && connection.delivery.includes("MCP"))
+      || (filter === "apps" && connection.delivery === "Codex App")
+      || (filter === "attention" && ["Setup required", "Needs login", "Disabled"].includes(connection.status));
+    return matchesQuery && matchesFilter;
+  });
+  const configured = data.catalogConnections.filter((connection) => isReadyStatus(connection.status)).length;
+  const attention = data.catalogConnections.length - configured;
+
+  return <div className="page-stack">
+    <section className="inventory-summary-grid">
+      <article className="inventory-stat"><span>⊞</span><div><strong>{data.catalogConnections.length}</strong><small>Detected capabilities</small></div></article>
+      <article className="inventory-stat"><span>✓</span><div><strong>{configured}</strong><small>Installed or enabled</small></div></article>
+      <article className="inventory-stat"><span>!</span><div><strong>{attention}</strong><small>Need attention or login</small></div></article>
+      <article className="inventory-stat wide"><span>◎</span><div><strong>Secrets excluded</strong><small>No MCP URLs, tokens, environment values, or local credentials were copied.</small></div></article>
+    </section>
+    <section className="card inventory-controls">
+      <div><span className="eyebrow">Current Codex inventory</span><h3>Search and assign connections</h3><p>Click a role button on any card to add or remove that capability from its onboarding template.</p></div>
+      <label className="inventory-search"><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find Gmail, MCP, PDF…" /></label>
+      <div className="filter-row" aria-label="Connection filters">{(["all", "plugins", "mcps", "apps", "attention"] as const).map((option) => <button key={option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option === "all" ? "All" : option === "mcps" ? "MCPs" : option[0].toUpperCase() + option.slice(1)}</button>)}</div>
+    </section>
+    <section className="catalog-grid" aria-label="Codex connection catalog">{filtered.map((connection) => <article className="catalog-card" key={connection.key}>
+      <div className="catalog-card-top"><span className="provider-logo large" style={{ background: connection.color }}>{connection.initials}</span><span className={`status ${statusClass(connection.status)}`}><i />{connection.status}</span></div>
+      <div className="catalog-copy"><span className="delivery-label">{connection.delivery}</span><h3>{connection.name}</h3><p>{connection.description}</p></div>
+      <div className="catalog-detail">{connection.statusDetail}</div>
+      <div className="assignment-list"><span>Role templates</span>{data.roles.map((role) => {
+        const assigned = connection.assignedRoles.includes(role.key);
+        const protectedAdminHub = role.key === "connection-admin" && connection.key === "agm-onboarding-hub";
+        const actionKey = `connection-${connection.key}-${role.key}`;
+        return <button key={role.key} className={assigned ? "assigned" : ""} disabled={busy === actionKey || protectedAdminHub} aria-label={`${assigned ? "Remove" : "Assign"} ${connection.name} ${role.name}`} onClick={() => mutate({ action: "set-role-connection", roleKey: role.key, connectionKey: connection.key, assigned: !assigned }, actionKey, `${connection.name} was ${assigned ? "removed from" : "added to"} ${role.name}.`)}><span>{assigned ? "✓" : "+"}</span>{role.name}</button>;
+      })}</div>
+    </article>)}</section>
+    {filtered.length === 0 ? <section className="card empty-state"><span>⌕</span><h3>No matching connections</h3><p>Try another search or filter.</p></section> : null}
+  </div>;
 }
 
 function Team({ data, busy, mutate }: { data: Snapshot; busy: string | null; mutate: (body: Record<string, unknown>, key: string, success: string) => Promise<void> }) {
@@ -133,8 +181,9 @@ function ReportTable({ reports }: { reports: Snapshot["installationReports"] }) 
 function EmptyState() { return <div className="empty-state"><span>✓</span><h3>No connection requests yet</h3><p>New staff requests will appear here.</p></div>; }
 function LoadingState() { return <div className="loading-grid"><span /><span /><span /><span /></div>; }
 function initials(value: string) { return value.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase(); }
-function authLabel(value: string) { return ({ shared_brokered: "AGM shared connection", personal_oauth: "Personal OAuth", local_cli: "Local device login" } as Record<string, string>)[value] ?? value; }
-function statusClass(status: string) { if (["Ready", "Active", "Approved", "Verified", "Saved"].includes(status)) return "good"; if (["Setup required", "Needs login", "Pending", "Available on request", "Reported"].includes(status)) return "warn"; if (["Denied", "Disabled", "Failed", "Revoked"].includes(status)) return "bad"; return "neutral"; }
+function authLabel(value: string) { return ({ shared_brokered: "AGM shared connection", personal_oauth: "Personal OAuth", local_cli: "Local device login", codex_plugin: "No separate login", local_mcp: "Local configuration", platform_mcp: "MCP authentication" } as Record<string, string>)[value] ?? value; }
+function isReadyStatus(status: string) { return ["Ready", "Active", "Approved", "Verified", "Saved", "Installed", "Enabled", "Available"].includes(status); }
+function statusClass(status: string) { if (isReadyStatus(status)) return "good"; if (["Setup required", "Needs login", "Pending", "Available on request", "Reported"].includes(status)) return "warn"; if (["Denied", "Disabled", "Failed", "Revoked"].includes(status)) return "bad"; return "neutral"; }
 function formatTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date); }
-function heading(view: View, admin: boolean) { return ({ setup: admin ? "Your onboarding control" : "Your Codex setup", team: "Staff onboarding", templates: "Connection templates", requests: "Connection requests", activity: "Onboarding activity" })[view]; }
-function subheading(view: View, admin: boolean) { return ({ setup: admin ? "Configure the pilot and verify the same setup staff will receive." : "Install your assigned capabilities and verify each connection.", team: "Assign reusable templates and revoke access in one place.", templates: "Package approved plugins, MCPs, CLIs, APIs, and account scopes by role.", requests: admin ? "Approve only the connections staff need for their work." : "Ask for an additional application without setting it up manually.", activity: "Review access changes and installation evidence without storing credentials." })[view]; }
+function heading(view: View, admin: boolean) { return ({ setup: admin ? "Your onboarding control" : "Your Codex setup", connections: "Codex connections", team: "Staff onboarding", templates: "Connection templates", requests: "Connection requests", activity: "Onboarding activity" })[view]; }
+function subheading(view: View, admin: boolean) { return ({ setup: admin ? "Configure the pilot and verify the same setup staff will receive." : "Install your assigned capabilities and verify each connection.", connections: "Search the detected inventory and change role assignments directly.", team: "Assign reusable templates and revoke access in one place.", templates: "Package approved plugins, MCPs, CLIs, APIs, and account scopes by role.", requests: admin ? "Approve only the connections staff need for their work." : "Ask for an additional application without setting it up manually.", activity: "Review access changes and installation evidence without storing credentials." })[view]; }
