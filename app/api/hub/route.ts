@@ -60,6 +60,15 @@ export async function POST(request: NextRequest) {
         const diagnosticResult = await runConnectionDiagnostic({ connectionKey: String(body.connectionKey), memberId: body.memberId ? Number(body.memberId) : undefined }, user.member);
         return NextResponse.json({ snapshot: await getHubSnapshot(user.member), diagnosticResult });
       }
+      case "run-all-diagnostics": {
+        if (!user.member.isAdmin) throw new Error("Administrator access required");
+        const catalog = (await getHubSnapshot(user.member)).catalogConnections;
+        const results = [];
+        for (const connection of catalog) {
+          results.push({ connectionKey: connection.key, result: await runConnectionDiagnostic({ connectionKey: connection.key }, user.member) });
+        }
+        return NextResponse.json({ snapshot: await getHubSnapshot(user.member), diagnosticResults: results });
+      }
       case "request-connection":
         await requestConnection(user.member, String(body.connectionKey), String(body.reason ?? ""));
         break;
