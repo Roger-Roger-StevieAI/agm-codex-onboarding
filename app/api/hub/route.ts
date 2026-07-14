@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         await deleteRoleTemplate(String(body.roleKey), user.member);
         break;
       case "invite-member":
-        await inviteMember({ name: String(body.name ?? ""), email: String(body.email ?? ""), roleKey: String(body.roleKey ?? "staff-tester") }, user.member);
+        await inviteMember({ name: String(body.name ?? ""), email: String(body.email ?? ""), roleKey: String(body.roleKey ?? "staff-tester"), connectionKeys: Array.isArray(body.connectionKeys) ? body.connectionKeys.map(String) : [] }, user.member);
         break;
       case "set-member-connection":
         await setMemberConnection({ memberId: Number(body.memberId), connectionKey: String(body.connectionKey), assigned: body.assigned === true, accountScope: String(body.accountScope ?? "") }, user.member);

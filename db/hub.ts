@@ -144,6 +144,7 @@ export async function initializeHub() {
   const seedStatements = [
     db.prepare("INSERT OR IGNORE INTO hub_role_templates (key, name, description) VALUES (?, ?, ?)").bind("connection-admin", "Connection Hub Admin", "Assign templates, approve requests, manage shared connections, and revoke access."),
     db.prepare("INSERT OR IGNORE INTO hub_role_templates (key, name, description) VALUES (?, ?, ?)").bind("staff-tester", "Staff Tester", "Install approved capabilities and verify the employee onboarding experience."),
+    db.prepare("INSERT OR IGNORE INTO hub_role_templates (key, name, description) VALUES (?, ?, ?)").bind("custom-access", "Custom connections", "A blank starting point for staff who receive a hand-picked connection bundle."),
     db.prepare("INSERT OR IGNORE INTO hub_members (name, email, role_key, status, is_admin, initials) VALUES (?, ?, ?, ?, ?, ?)").bind("Stevie Kirk", "stevie@agmagency.com", "connection-admin", "Active", 1, "SK"),
     db.prepare("INSERT OR IGNORE INTO hub_members (name, email, role_key, status, is_admin, initials) VALUES (?, ?, ?, ?, ?, ?)").bind("Jean", "jean@agmagency.com", "staff-tester", "Active", 0, "J"),
     ...connectionCatalog.map((connection) => db.prepare("INSERT OR IGNORE INTO hub_connections (key, name, description, auth_model, delivery, status, status_detail, color, initials) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(connection.key, connection.name, connection.description, connection.authModel, connection.delivery, connection.status, connection.statusDetail, connection.color, connection.initials)),
@@ -304,17 +305,29 @@ export async function getMemberById(memberId: number) {
   return row ? { ...row, isAdmin: Boolean(row.isAdmin) } : null;
 }
 
-export async function inviteMember(input: { name: string; email: string; roleKey: string }, actor: HubMember) {
+export async function inviteMember(input: { name: string; email: string; roleKey: string; connectionKeys?: string[] }, actor: HubMember) {
   if (!actor.isAdmin) throw new Error("Administrator access required");
   const name = input.name.trim().slice(0, 100);
   const email = input.email.trim().toLowerCase().slice(0, 200);
   if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter a valid name and email address");
-  const role = await database().prepare("SELECT name FROM hub_role_templates WHERE key = ?").bind(input.roleKey).first<{ name: string }>();
+  const db = database();
+  const role = await db.prepare("SELECT name FROM hub_role_templates WHERE key = ?").bind(input.roleKey).first<{ name: string }>();
   if (!role) throw new Error("Unknown template");
+  const connectionKeys = [...new Set((input.connectionKeys ?? []).map((key) => key.trim()).filter(Boolean))].slice(0, 100);
+  if (connectionKeys.length) {
+    const placeholders = connectionKeys.map(() => "?").join(",");
+    const rows = await db.prepare(`SELECT key FROM hub_connections WHERE key IN (${placeholders})`).bind(...connectionKeys).all<{ key: string }>();
+    const validKeys = new Set((rows.results ?? []).map((row) => row.key));
+    if (connectionKeys.some((key) => !validKeys.has(key))) throw new Error("One or more selected connections are unavailable");
+  }
   const memberInitials = name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-  await database().batch([
-    database().prepare("INSERT INTO hub_members (name, email, role_key, status, is_admin, initials) VALUES (?, ?, ?, 'Active', 0, ?)").bind(name, email, input.roleKey, memberInitials || "U"),
-    database().prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor.name, "Invited staff member", email, role.name, new Date().toISOString()),
+  await db.prepare("INSERT INTO hub_members (name, email, role_key, status, is_admin, initials) VALUES (?, ?, ?, 'Active', 0, ?)").bind(name, email, input.roleKey, memberInitials || "U").run();
+  const member = await db.prepare("SELECT id FROM hub_members WHERE email = ?").bind(email).first<{ id: number }>();
+  if (!member) throw new Error("The staff member could not be created");
+  const now = new Date().toISOString();
+  await db.batch([
+    ...connectionKeys.map((connectionKey) => db.prepare("INSERT INTO hub_member_connections (member_id, connection_key, direct_assignment, account_scope, delivery_status, assigned_by, assigned_at) VALUES (?, ?, 1, 'Selected at invite', 'Sent', ?, ?)").bind(member.id, connectionKey, actor.email, now)),
+    db.prepare("INSERT INTO hub_audit_events (actor, event, target, result, created_at) VALUES (?, ?, ?, ?, ?)").bind(actor.name, "Invited staff member", email, `${role.name}${connectionKeys.length ? ` + ${connectionKeys.length} selected connections` : ""}`, now),
   ]);
 }
 
@@ -398,7 +411,7 @@ export async function updateRoleTemplate(input: { roleKey: string; name: string;
 
 export async function deleteRoleTemplate(roleKey: string, actor: HubMember) {
   if (!actor.isAdmin) throw new Error("Administrator access required");
-  if (["connection-admin", "staff-tester"].includes(roleKey)) throw new Error("Pilot templates are protected");
+  if (["connection-admin", "staff-tester", "custom-access"].includes(roleKey)) throw new Error("Pilot templates are protected");
   const db = database();
   const role = await db.prepare("SELECT name FROM hub_role_templates WHERE key = ?").bind(roleKey).first<{ name: string }>();
   if (!role) throw new Error("Unknown template");
