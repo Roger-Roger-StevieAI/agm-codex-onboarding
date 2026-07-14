@@ -18,6 +18,7 @@ fi
 
 say "Adding the AGM Codex marketplace and plugin…"
 codex plugin marketplace add "$MARKETPLACE_REPO" --ref main
+codex plugin marketplace upgrade "$MARKETPLACE_NAME"
 codex plugin add "$PLUGIN_NAME@$MARKETPLACE_NAME"
 
 if ! command -v higgsfield >/dev/null 2>&1; then

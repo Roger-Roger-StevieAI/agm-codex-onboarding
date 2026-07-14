@@ -20,6 +20,8 @@ if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
 Write-Host "Adding the AGM Codex marketplace and plugin..."
 codex plugin marketplace add $MarketplaceRepo --ref main
 if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Codex could not add the AGM marketplace." }
+codex plugin marketplace upgrade $MarketplaceName
+if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Codex could not refresh the AGM marketplace." }
 codex plugin add "$PluginName@$MarketplaceName"
 if ($LASTEXITCODE -ne 0) { Stop-Onboarding "Codex could not install the AGM onboarding plugin." }
 

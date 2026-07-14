@@ -72,6 +72,7 @@ test("ships secret-free Mac and Windows installers", async () => {
 
   for (const installer of [mac, windows]) {
     assert.match(installer, /codex plugin marketplace add/);
+    assert.match(installer, /codex plugin marketplace upgrade/);
     assert.match(installer, /codex plugin add/);
     assert.match(installer, /higgsfield account status/);
     assert.match(installer, /higgsfield generate create z_image/);
