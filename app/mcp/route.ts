@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   }
   if (rpc.jsonrpc !== "2.0" || !rpc.method) return failure(rpc.id, -32600, "Invalid JSON-RPC request");
   if (rpc.id === undefined) return new NextResponse(null, { status: 202, headers });
-  if (rpc.method === "initialize") return result(rpc.id, { protocolVersion: rpc.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "agm-codex-onboarding", version: "0.2.0" }, instructions: "Use this server to finish AGM Codex onboarding. Never ask for passwords, tokens, recovery codes, or browser-session data." });
+  if (rpc.method === "initialize") return result(rpc.id, { protocolVersion: rpc.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "agm-codex-onboarding", version: "0.2.1" }, instructions: "Use this server to finish AGM Codex onboarding. Never ask for passwords, tokens, recovery codes, or browser-session data." });
   if (rpc.method === "ping") return result(rpc.id, {});
   if (rpc.method === "tools/list") return result(rpc.id, { tools });
 
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const user = await getAuthorizedHubUser();
   if (!user) return NextResponse.json({ error: "Authentication required" }, { headers, status: 401 });
-  return NextResponse.json({ name: "AGM Codex Onboarding MCP", version: "0.2.0", transport: "streamable-http", tools: tools.map((tool) => tool.name) }, { headers });
+  return NextResponse.json({ name: "AGM Codex Onboarding MCP", version: "0.2.1", transport: "streamable-http", tools: tools.map((tool) => tool.name) }, { headers });
 }
 
 export function OPTIONS() {

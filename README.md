@@ -15,13 +15,13 @@ A public, credential-free Codex marketplace and protected onboarding hub for AGM
 Mac:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/main/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/v0.2.1/install/install.sh | bash
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/main/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/v0.2.1/install/install.ps1 | iex
 ```
 
 Both installers:

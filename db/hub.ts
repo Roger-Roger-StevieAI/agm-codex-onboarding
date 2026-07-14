@@ -112,8 +112,8 @@ export async function getHubSnapshot(viewer: HubMember): Promise<HubSnapshot> {
     auditEvents: auditRows.results as HubSnapshot["auditEvents"],
     installer: {
       repository: "https://github.com/Roger-Roger-StevieAI/agm-codex-onboarding",
-      macCommand: "curl -fsSL https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/main/install/install.sh | bash",
-      windowsCommand: "irm https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/main/install/install.ps1 | iex",
+      macCommand: "curl -fsSL https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/v0.2.1/install/install.sh | bash",
+      windowsCommand: "irm https://raw.githubusercontent.com/Roger-Roger-StevieAI/agm-codex-onboarding/v0.2.1/install/install.ps1 | iex",
     },
   };
 }
