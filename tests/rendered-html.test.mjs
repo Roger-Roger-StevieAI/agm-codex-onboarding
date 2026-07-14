@@ -24,11 +24,44 @@ test("ships the onboarding hub instead of demonstration data", async () => {
   assert.match(hub, /composio-mcp/);
   assert.match(hub, /zapier-mcp/);
   assert.match(hub, /catalogConnections/);
-  assert.match(dashboard, /Search and assign connections/);
+  assert.match(dashboard, /Set up, assign, and debug connections/);
   assert.match(dashboard, /set-role-connection/);
+  assert.match(dashboard, /Set up & debug/);
+  assert.match(dashboard, /Send connections to/);
+  assert.match(dashboard, /Create a template/);
   assert.match(api, /setRoleConnection/);
   assert.doesNotMatch(hub, /demonstration/i);
   await assert.rejects(access(new URL("app/_sites-preview/SkeletonPreview.tsx", root)));
+});
+
+test("ships provider setup, individual delivery, templates, and persistent diagnostics", async () => {
+  const [schema, hub, api, runtime, composio, dashboard, migration] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/hub.ts", root), "utf8"),
+    readFile(new URL("app/api/hub/route.ts", root), "utf8"),
+    readFile(new URL("app/connection-runtime.ts", root), "utf8"),
+    readFile(new URL("app/composio-runtime.ts", root), "utf8"),
+    readFile(new URL("app/ConnectionHub.tsx", root), "utf8"),
+    readFile(new URL("drizzle/0002_wooden_cyclops.sql", root), "utf8"),
+  ]);
+
+  for (const source of [schema, hub, migration]) {
+    assert.match(source, /hub_connection_configs|connectionConfigs/);
+    assert.match(source, /hub_member_connections|memberConnections/);
+    assert.match(source, /hub_connection_diagnostics|connectionDiagnostics/);
+  }
+  assert.match(api, /begin-connection/);
+  assert.match(api, /run-diagnostic/);
+  assert.match(api, /create-template/);
+  assert.match(api, /set-member-connection/);
+  assert.match(runtime, /ensureAssigned/);
+  assert.match(runtime, /recordDiagnostic/);
+  assert.match(composio, /\/connected_accounts\/link/);
+  assert.match(composio, /\/logs\/tool_execution/);
+  assert.match(composio, /safeDiagnosticTools/);
+  assert.match(dashboard, /Create secure sign-in link/);
+  assert.match(dashboard, /Diagnostic history/);
+  assert.doesNotMatch(composio, /COMPOSIO_API_KEY\s*=/);
 });
 
 test("includes a valid public AGM plugin backed by the protected MCP", async () => {

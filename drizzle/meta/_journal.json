@@ -15,6 +15,13 @@
       "when": 1783977950029,
       "tag": "0001_onboarding_pilot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784059557677,
+      "tag": "0002_wooden_cyclops",
+      "breakpoints": true
     }
   ]
 }

@@ -47,6 +47,51 @@ export const connectionRequests = sqliteTable("hub_connection_requests", {
   decidedBy: text("decided_by"),
 });
 
+export const connectionConfigs = sqliteTable("hub_connection_configs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  connectionKey: text("connection_key").notNull(),
+  provider: text("provider").notNull().default("manual"),
+  toolkitSlug: text("toolkit_slug"),
+  authConfigId: text("auth_config_id"),
+  connectedAccountId: text("connected_account_id"),
+  ownerUserId: text("owner_user_id"),
+  testToolSlug: text("test_tool_slug"),
+  testToolVersion: text("test_tool_version"),
+  setupNotes: text("setup_notes").notNull().default(""),
+  setupStatus: text("setup_status").notNull().default("Not configured"),
+  lastSyncedAt: text("last_synced_at"),
+  lastError: text("last_error"),
+}, (table) => [uniqueIndex("hub_connection_configs_connection_unique").on(table.connectionKey)]);
+
+export const memberConnections = sqliteTable("hub_member_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  memberId: integer("member_id").notNull(),
+  connectionKey: text("connection_key").notNull(),
+  directAssignment: integer("direct_assignment", { mode: "boolean" }).notNull().default(false),
+  accountScope: text("account_scope").notNull().default("Individual assignment"),
+  deliveryStatus: text("delivery_status").notNull().default("Assigned"),
+  authConfigId: text("auth_config_id"),
+  providerAccountId: text("provider_account_id"),
+  providerStatus: text("provider_status"),
+  assignedBy: text("assigned_by").notNull(),
+  assignedAt: text("assigned_at").notNull(),
+  lastSyncedAt: text("last_synced_at"),
+}, (table) => [uniqueIndex("hub_member_connections_member_connection_unique").on(table.memberId, table.connectionKey)]);
+
+export const connectionDiagnostics = sqliteTable("hub_connection_diagnostics", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  connectionKey: text("connection_key").notNull(),
+  memberId: integer("member_id"),
+  actor: text("actor").notNull(),
+  status: text("status").notNull(),
+  stage: text("stage").notNull(),
+  summary: text("summary").notNull(),
+  detail: text("detail").notNull(),
+  providerLogId: text("provider_log_id"),
+  durationMs: integer("duration_ms").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+});
+
 export const installationReports = sqliteTable("hub_installation_reports", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   memberId: integer("member_id").notNull(),

@@ -35,7 +35,18 @@ Both installers:
 
 The scripts contain no AGM credentials. Review them before running: [Mac installer](install/install.sh) and [Windows installer](install/install.ps1).
 
-## Hub capabilities
+## Operational hub
+
+The protected dashboard now provides four working control surfaces:
+
+- **Connections:** create definitions, choose Composio/Codex/local delivery, save safe provider identifiers, launch provider-hosted OAuth, run read-only tests, and retain sanitized diagnostic history.
+- **Templates:** create and edit reusable role packages, then choose exactly which capabilities each package contains.
+- **Staff:** invite an email, assign a baseline template, send or revoke an individual exception, copy the staff setup link, and disable hub access immediately.
+- **Requests and activity:** employees request additional access; approval delivers it only to that employee. The audit and diagnostic tables retain the result without retaining credentials.
+
+For Composio-backed providers, the server uses a protected `COMPOSIO_API_KEY`. OAuth credentials stay in Composio and provider tokens never pass through the dashboard. Auth configurations are auto-discovered from the saved toolkit slug, while optional IDs can be pinned by an administrator.
+
+## MCP capabilities
 
 Staff-facing MCP tools:
 
@@ -50,7 +61,7 @@ Read-only Meta tools:
 - `meta_list_ad_accounts`
 - `meta_get_campaign_insights`
 
-The dashboard lets Stevie assign templates, approve or deny requests, revoke or restore staff, inspect installation reports, and review the onboarding audit trail. Deactivated members fail every dashboard, API, and MCP authorization check immediately.
+Deactivated members fail every dashboard, API, and MCP authorization check immediately.
 
 For the current test, the administrator catalog also contains a secret-free snapshot of the capabilities detected in Stevie's Codex profile: installed plugins, configured MCPs, available Codex Apps, and Higgsfield. The Connections screen supports search, filters, and direct role-template assignment. Detection never copies MCP URLs, embedded credentials, environment values, OAuth tokens, or local provider tokens into the hub.
 
@@ -61,11 +72,9 @@ The code is ready, but live Meta verification requires AGM's external authorizat
 1. Create an AGM Meta developer app.
 2. Configure its OAuth client in a Composio Meta Ads auth configuration.
 3. Authorize the AGM administrator connection and verify the expected Meta Business ad accounts.
-4. Add the following server-only Sites environment variables:
-   - `COMPOSIO_API_KEY`
-   - `COMPOSIO_META_CONNECTED_ACCOUNT_ID`
-   - `COMPOSIO_META_TOOLKIT_VERSION` (optional)
-5. Use the hub's Meta test. It can only list ad accounts and retrieve a bounded campaign-insights sample.
+4. Add `COMPOSIO_API_KEY` as a server-only Sites environment variable. The Connection console can then create secure Connect Links and auto-discover enabled auth configurations.
+5. For the legacy read-only Meta MCP tools, also set `COMPOSIO_META_CONNECTED_ACCOUNT_ID` and optionally `COMPOSIO_META_TOOLKIT_VERSION`.
+6. Use the hub's Meta test. It can only list ad accounts and retrieve a bounded campaign-insights sample.
 
 Never put those values in this repository, an installer, a dashboard field, a log, or an MCP response.
 
@@ -87,8 +96,10 @@ The local dashboard is `http://localhost:3000`; its MCP endpoint is `http://loca
 - `app/ConnectionHub.tsx` — onboarding dashboard
 - `app/api/hub/route.ts` — administrator and staff actions
 - `app/mcp/route.ts` — authenticated MCP gateway
-- `app/meta-ads.ts` — server-only read-only Composio adapter
-- `db/hub.ts` — invited users, templates, assignments, requests, reports, and audit events
+- `app/composio-runtime.ts` — server-only OAuth, account status, read-only tests, and sanitized provider logs
+- `app/connection-runtime.ts` — assignment-aware connection and diagnostic orchestration
+- `app/meta-ads.ts` — server-only read-only Meta MCP adapter
+- `db/hub.ts` — invited users, templates, individual delivery, provider state, diagnostics, requests, reports, and audit events
 - `plugins/agm-codex-onboarding/` — public Codex plugin
 - `.agents/plugins/marketplace.json` — public marketplace catalog
 - `install/` — secret-free Mac and Windows installers
