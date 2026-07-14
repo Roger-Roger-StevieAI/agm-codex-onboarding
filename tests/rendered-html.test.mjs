@@ -79,4 +79,5 @@ test("ships secret-free Mac and Windows installers", async () => {
     assert.doesNotMatch(installer, /COMPOSIO_API_KEY/);
     assert.doesNotMatch(installer, /access[_-]?token\s*=/i);
   }
+  assert.doesNotMatch(mac, /codex plugin list\s*\|/, "Codex list output must not be piped to an early-closing verifier");
 });

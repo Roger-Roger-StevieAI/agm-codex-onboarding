@@ -42,7 +42,11 @@ for skill in "${SKILLS[@]}"; do
 done
 
 say "Verifying the installed package…"
-codex plugin list | grep -q "$PLUGIN_NAME" || fail "Codex could not verify the AGM plugin. Restart Codex and rerun the installer."
+plugin_list="$(codex plugin list 2>&1)" || fail "Codex could not list installed plugins. Restart Codex and rerun the installer."
+case "$plugin_list" in
+  *"$PLUGIN_NAME@$MARKETPLACE_NAME"*) ;;
+  *) fail "The AGM plugin was not present after installation. Restart Codex and rerun the installer." ;;
+esac
 higgsfield --version
 
 if higgsfield account status >/dev/null 2>&1; then
@@ -54,7 +58,7 @@ else
 fi
 
 run_test="n"
-if [ -r /dev/tty ]; then
+if [ -t 1 ] && [ -r /dev/tty ]; then
   printf '\nGenerate one inexpensive Higgsfield onboarding test image now? [y/N] ' >/dev/tty
   read -r run_test </dev/tty || true
 fi
